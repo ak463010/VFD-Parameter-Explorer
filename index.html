@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Parameter Explorer</title>
+    <title>VFD Parameter Explorer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,21 +17,26 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+
         .param-list::-webkit-scrollbar {
             width: 6px;
         }
+
         .param-list::-webkit-scrollbar-track {
             background: #f1f5f9;
         }
+
         .param-list::-webkit-scrollbar-thumb {
             background: #94a3b8;
             border-radius: 3px;
         }
+
         .param-list::-webkit-scrollbar-thumb:hover {
             background: #64748b;
         }
     </style>
 </head>
+
 <body class="bg-slate-50 text-slate-800">
 
     <div class="container mx-auto p-4 md:p-8">
@@ -48,7 +54,7 @@
         </header>
 
         <div class="bg-white rounded-xl shadow-lg border border-slate-200 grid grid-cols-1 md:grid-cols-12 min-h-[70vh]">
-            
+
             <aside class="md:col-span-4 lg:col-span-3 border-r border-slate-200 p-4 flex flex-col">
                 <div class="relative mb-4">
                     <input type="text" id="searchInput" placeholder="Search parameters..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition">
@@ -59,7 +65,10 @@
                 <div id="parameterList" class="param-list flex-grow overflow-y-auto p-1">
                 </div>
             </aside>
-            
+
+            <!-- Horizontal line for mobile view -->
+            <div class="col-span-full md:hidden border-b border-slate-200 my-4"></div>
+
             <main id="parameterDetails" class="md:col-span-8 lg:col-span-9 p-6 md:p-8">
                 <p class="text-slate-500">Select a parameter to see its details.</p>
             </main>
@@ -339,19 +348,19 @@
             function displayParameterDetails(paramId) {
                 const detailsContainer = document.getElementById('parameterDetails');
                 const param = currentParameterData.find(p => p.id === paramId);
-                
+
                 if (!param) {
                     detailsContainer.innerHTML = `<p class="text-slate-500">Select a parameter to see its details.</p>`;
                     return;
                 }
 
-                let settingsHtml = param.settings.map(setting => 
+                let settingsHtml = param.settings.map(setting =>
                     `<li class="flex items-start">
                         <svg class="w-5 h-5 text-sky-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span>${setting.replace(/`([^`]+)`/g, '<code class="bg-slate-200 text-slate-800 font-mono py-0.5 px-1.5 rounded-md text-sm">$1</code>')}</span>
                     </li>`
                 ).join('');
-                
+
                 let noteHtml = param.note ? `<div class="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
                     <h4 class="font-semibold mb-1">Note</h4>
                     <p>${param.note}</p>
@@ -393,23 +402,23 @@
             function populateList() {
                 parameterList.innerHTML = '';
                 document.getElementById('parameterDetails').innerHTML = `<p class="text-slate-500">Select a parameter to see its details.</p>`;
-                activeParameterButton = null; 
-                
+                activeParameterButton = null;
+
                 updateSubHeader(driveModelSelect.value); // Update sub-header with current model
 
                 currentParameterData.forEach(param => {
                     const button = document.createElement('button');
-                    // Ensure that focus styles maintain the border visibility
+                    // Changed px-4 py-2 to p-2 for better visual balance with my-1
                     button.className = 'w-full text-left my-1 p-2 rounded-lg transition duration-150 ease-in-out hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-2 focus:border-sky-500 border border-transparent';
                     button.textContent = `${param.id}: ${param.name}`;
                     button.dataset.paramId = param.id;
-                    
+
                     button.addEventListener('click', () => {
                         if (activeParameterButton) {
-                            activeParameterButton.classList.remove('bg-sky-100', 'text-sky-800', 'border-sky-500', 'border-2');
+                            activeParameterButton.classList.remove('bg-sky-100', 'text-sky-800', 'font-semibold', 'border-sky-500', 'border-2');
                             activeParameterButton.classList.add('border-transparent');
                         }
-                        button.classList.add('bg-sky-100', 'text-sky-800', 'border-2', 'border-sky-500');
+                        button.classList.add('bg-sky-100', 'text-sky-800', 'font-semibold', 'border-2', 'border-sky-500');
                         button.classList.remove('border-transparent');
                         activeParameterButton = button;
                         displayParameterDetails(param.id);
@@ -422,11 +431,11 @@
             // Event listener for the drive model select dropdown
             driveModelSelect.addEventListener('change', (e) => {
                 const selectedModel = e.target.value;
-                currentParameterData = driveData[selectedModel]; 
-                populateList(); 
-                searchInput.value = ''; 
+                currentParameterData = driveData[selectedModel];
+                populateList();
+                searchInput.value = '';
                 if (parameterList.firstChild) {
-                    parameterList.firstChild.click(); 
+                    parameterList.firstChild.click();
                 }
             });
 
@@ -450,7 +459,7 @@
             } else {
                 displayParameterDetails(null);
             }
-            
+
             const style = document.createElement('style');
             style.textContent = `
                 @keyframes fade-in {
@@ -465,4 +474,5 @@
         });
     </script>
 </body>
+
 </html>
