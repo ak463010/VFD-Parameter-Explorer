@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Parameter Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutral -->
+    <!-- Application Structure Plan: A two-column dashboard layout. The left column contains a searchable/filterable list of all parameters, acting as the primary navigation. The right column is a content panel that displays the detailed information (explanation, settings, default value) for the parameter selected from the list. A new dropdown switcher has been added in the header to allow users to select different drive models (DELTA MS300, SINAMICS G120, Others). This allows for exploring parameters across different drive types, maintaining the intuitive master-detail structure for each selected model. -->
+    <!-- Visualization & Content Choices: The source data is textual and descriptive, not quantitative. Therefore, no charts are used. The focus is on clear, structured presentation of text using semantic HTML and clean typography. The main interaction is the filterable list on the left which dynamically updates the content on the right. The new interaction is a dropdown to switch between different drive models, dynamically changing the parameter list and details displayed. Goal: Inform/Organize/Compare (across models). Method: Interactive List (HTML/JS/Tailwind) -> Detail View (HTML/JS/Tailwind) and Model Selector (HTML/JS/Tailwind). Justification: This is the most effective way to present this type of reference information for easy lookup and to extend functionality for multiple drive models. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .param-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .param-list::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .param-list::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 3px;
+        }
+        .param-list::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">VFD Parameter Explorer</h1>
+            <p id="subHeader" class="mt-2 text-lg text-slate-600">An interactive guide for the current drive model.</p>
+            <div class="mt-4 flex items-center justify-center space-x-2">
+                <label for="driveModelSelect" class="text-slate-700 font-medium">Select Drive Model:</label>
+                <select id="driveModelSelect" class="p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition">
+                    <option value="DELTA MS300">DELTA MS300</option>
+                    <option value="SINAMICS G120">SINAMICS G120</option>
+                    <option value="Others">Others</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="bg-white rounded-xl shadow-lg border border-slate-200 grid grid-cols-1 md:grid-cols-12 min-h-[70vh]">
+            
+            <aside class="md:col-span-4 lg:col-span-3 border-r border-slate-200 p-4 flex flex-col">
+                <div class="relative mb-4">
+                    <input type="text" id="searchInput" placeholder="Search parameters..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div id="parameterList" class="param-list flex-grow overflow-y-auto p-1">
+                </div>
+            </aside>
+            
+            <main id="parameterDetails" class="md:col-span-8 lg:col-span-9 p-6 md:p-8">
+                <p class="text-slate-500">Select a parameter to see its details.</p>
+            </main>
+
+        </div>
+    </div>
+
+    <script>
+        // Data for different drive models
+        const driveData = {
+            "DELTA MS300": [
+                {
+                    id: "00-02",
+                    name: "Parameter reset",
+                    explanation: "Resets parameters to default settings or performs other system-level functions.",
+                    settings: [
+                        "`0`: No function",
+                        "`1`: Write protection for parameters",
+                        "`5`: Return kWh displays to 0",
+                        "`6`: Reset PLC (including CANopen Master Index)",
+                        "`7`: Reset CANopen Slave index",
+                        "`8`: Keypad does not respond",
+                        "`9`: Reset all parameters to defaults (base frequency is 50 Hz)",
+                        "`10`: Reset all parameters to defaults (base frequency is 60 Hz)",
+                        "`11`: Reset all parameters to defaults (base frequency 50 Hz, keeps user-defined values)",
+                        "`12`: Reset all parameters to defaults (base frequency 60 Hz, keeps user-defined values)"
+                    ],
+                    default: "`0`",
+                    recommendation: "Use `9` or `10` for full reset, or `11`/`12` to preserve user-defined parameters when changing base frequency. Avoid `8` unless intending to lock the keypad."
+                },
+                {
+                    id: "00-03",
+                    name: "Start-up display",
+                    explanation: "Selects the information shown on the drive's display upon start-up.",
+                    settings: [
+                        "`0`: F (frequency command)",
+                        "`1`: H (output frequency)",
+                        "`2`: U (user-defined, see Pr.00-04)",
+                        "`3`: A (output current)"
+                    ],
+                    default: "`0`",
+                    recommendation: "Set to `1` (output frequency) for real-time monitoring of the motor's operation, or `3` (output current) for observing load conditions."
+                },
+                {
+                    id: "00-20",
+                    name: "Master frequency command source (AUTO, REMOTE)",
+                    explanation: "Determines the source of the main frequency command when in AUTO or REMOTE mode.",
+                    settings: [
+                        "`0`: Digital keypad",
+                        "`1`: RS-485 communication input",
+                        "`2`: External analog input (Refer to Pr.03-00)",
+                        "`3`: External UP/DOWN terminal",
+                        "`4`: Pulse input without direction command",
+                        "`6`: CANopen communication card",
+                        "`7`: Digital keypad potentiometer knob",
+                        "`8`: Communication card (non-CANopen)",
+                        "`9`: PID controller"
+                    ],
+                    default: "`0`",
+                    recommendation: "For remote control, `1` (RS-485) or `6` (CANopen) are recommended depending on your communication network. For local manual control, `0` (Digital keypad) is suitable."
+                },
+                {
+                    id: "00-21",
+                    name: "Operation command source (AUTO, REMOTE)",
+                    explanation: "Determines the source of the run/stop command when in AUTO or REMOTE mode.",
+                    settings: [
+                        "`0`: Digital keypad",
+                        "`1`: External terminals",
+                        "`2`: RS-485 communication input",
+                        "`3`: CANopen communication card",
+                        "`5`: Communication card (non-CANopen)"
+                    ],
+                    note: "HOA (Hand-Off-Auto) function is valid only when used with specific multi-function output settings or the KPC-CC01 keypad.",
+                    default: "`0`",
+                    recommendation: "Match this setting with `Pr.00-20` for consistent control. For safety-critical applications, `1` (External terminals) is often preferred for physical control."
+                },
+                {
+                    id: "00-22",
+                    name: "Stop method",
+                    explanation: "Defines how the motor stops when a stop command is issued.",
+                    settings: [
+                        "`0`: Ramp to stop (decelerates along the defined deceleration ramp)",
+                        "`1`: Coast to stop (removes power and lets the motor coast to a halt)"
+                    ],
+                    default: "`0`",
+                    recommendation: "Use `0` (Ramp to stop) for applications requiring controlled stops, such as conveyors or lifting equipment. Use `1` (Coast to stop) where an immediate power cut and free-wheeling stop is acceptable."
+                },
+                {
+                    id: "00-23",
+                    name: "Motor direction control",
+                    explanation: "Enables or disables forward and reverse motor rotation.",
+                    settings: [
+                        "`0`: Enable forward / reverse",
+                        "`1`: Disable reverse",
+                        "`2`: Disable forward"
+                    ],
+                    default: "`0`",
+                    recommendation: "Set to `1` or `2` if the application only requires unidirectional movement, preventing accidental reverse or forward operation and potentially simplifying control logic."
+                },
+                {
+                    id: "00-32",
+                    name: "Digital keypad STOP function",
+                    explanation: "Enables or disables the STOP key on the digital keypad.",
+                    settings: [
+                        "`0`: STOP key disabled",
+                        "`1`: STOP key enabled"
+                    ],
+                    default: "`0`",
+                    recommendation: "For safety, it is generally recommended to set this to `1` (STOP key enabled) to allow for immediate local stopping in emergencies. However, in fully automated systems, it might be disabled."
+                },
+                {
+                    id: "01-07",
+                    name: "Minimum output frequency of motor 1",
+                    explanation: "Sets the lowest frequency the drive will output to motor 1.",
+                    settings: [
+                        "Range: `0.00` - `599.00 Hz`"
+                    ],
+                    default: "`0.50` Hz",
+                    recommendation: "Adjust this value to prevent motor stalling at very low speeds or to avoid resonance frequencies within your mechanical system. A value of `0.00 Hz` enables true zero-speed operation if supported by the control mode."
+                },
+                {
+                    id: "01-12",
+                    name: "Acceleration time 1",
+                    explanation: "The time it takes for the motor to accelerate from 0 Hz to the maximum frequency (Pr.01-00).",
+                    settings: [
+                        "If Pr.01-45=0: `0.00` - `600.00` sec.",
+                        "If Pr.01-45=1: `0.0` - `6000.0` sec."
+                    ],
+                    default: "`10.00` sec. / `10.0` sec.",
+                    recommendation: "A shorter acceleration time leads to faster starts but higher current peaks. Balance this with the mechanical system's inertia and the motor's capacity to avoid overcurrent trips. Experiment to find the optimal smooth start."
+                },
+                {
+                    id: "01-13",
+                    name: "Deceleration time 1",
+                    explanation: "The time it takes for the motor to decelerate from the maximum frequency (Pr.01-00) to 0 Hz.",
+                    settings: [
+                        "If Pr.01-45=0: `0.00` - `600.00` sec.",
+                        "If Pr.01-45=1: `0.0` - `6000.0` sec."
+                    ],
+                    default: "`10.00` sec. / `10.0` sec.",
+                    recommendation: "Longer deceleration times reduce braking stress on the motor and mechanical components, but can lead to longer stop times. Too short a time may cause overvoltage trips due to regenerative energy. Consider adding a braking resistor if very short deceleration is required."
+                },
+                {
+                    id: "02-35",
+                    name: "External operation control selection after reset",
+                    explanation: "Determines the drive's behavior if a RUN command is active after a reset or reboot.",
+                    settings: [
+                        "`0`: Disable (Requires a new RUN command)",
+                        "`1`: Drive runs if the RUN command remains active after reset or reboot"
+                    ],
+                    default: "`0`",
+                    recommendation: "Setting to `0` (Disable) is safer for most applications as it prevents unintended starts after a power cycle or fault reset. Only use `1` if continuous operation is critical and supervised, such as in processes where downtime is costly and immediate restart is necessary."
+                }
+            ],
+            "SINAMICS G120": [
+                // Illustrative data for SINAMICS G120, not based on actual documentation
+                {
+                    id: "P0003",
+                    name: "Control unit operating mode",
+                    explanation: "Defines the operating mode of the control unit, e.g., for parameter access or operation.",
+                    settings: [
+                        "`0`: Parameter access (offline mode)",
+                        "`1`: Operation (online mode)",
+                        "`2`: Maintenance mode"
+                    ],
+                    default: "`0`",
+                    recommendation: "Typically set to `1` for normal operation. Switch to `0` only for configuration and parameter changes."
+                },
+                {
+                    id: "P0004",
+                    name: "Power unit type",
+                    explanation: "Identifies the type of power unit connected to the control unit.",
+                    settings: [
+                        "`0`: G120 PM240 (standard power module)",
+                        "`1`: G120 PM250 (regenerative power module)",
+                        "`2`: G120 PM340 (high-performance power module)"
+                    ],
+                    default: "`0`",
+                    recommendation: "This parameter is automatically detected. Verify it matches your physical hardware to ensure correct operation."
+                },
+                {
+                    id: "P0010",
+                    name: "Commissioning mode",
+                    explanation: "Selects the commissioning state, guiding through initial setup steps.",
+                    settings: [
+                        "`0`: Ready (commissioning complete)",
+                        "`1`: Quick commissioning (guided setup)",
+                        "`2`: Extended commissioning"
+                    ],
+                    default: "`0`",
+                    recommendation: "Use `1` for initial setup with a guided wizard. Set to `0` once commissioning is complete for normal operation."
+                },
+                {
+                    id: "P0011",
+                    name: "Quick commissioning status",
+                    explanation: "Indicates if quick commissioning is active or completed.",
+                    settings: [
+                        "`0`: Not active",
+                        "`1`: Active"
+                    ],
+                    default: "`0`",
+                    recommendation: "This parameter is usually controlled by the commissioning process. No manual adjustment is typically required unless troubleshooting."
+                },
+                {
+                    id: "P0100",
+                    name: "Units of physical quantities",
+                    explanation: "Defines the units for various physical quantities displayed or used by the drive.",
+                    settings: [
+                        "`0`: kW, Hz, A, V",
+                        "`1`: HP, Hz, A, V",
+                        "`2`: kW, rpm, A, V"
+                    ],
+                    default: "`0`",
+                    recommendation: "Choose the unit system that is most familiar to the operating personnel or matches the system's documentation for clarity."
+                },
+                {
+                    id: "P0304",
+                    name: "Motor rated voltage",
+                    explanation: "Sets the rated voltage of the connected motor.",
+                    settings: [
+                        "Range: `0.0` - `999.9` V"
+                    ],
+                    default: "``",
+                    recommendation: "Input the exact rated voltage from the motor's nameplate for optimal motor control and protection."
+                },
+                {
+                    id: "P0305",
+                    name: "Motor rated current",
+                    explanation: "Sets the rated current of the connected motor.",
+                    settings: [
+                        "Range: `0.0` - `999.9` A"
+                    ],
+                    default: "``",
+                    recommendation: "Input the exact rated current from the motor's nameplate for accurate motor thermal protection and current control."
+                }
+            ],
+            "Others": [
+                // Illustrative data for "Others"
+                {
+                    id: "GEN-01",
+                    name: "General Setting 1",
+                    explanation: "A generic configurable parameter for various system functions.",
+                    settings: [
+                        "`0`: Option A",
+                        "`1`: Option B",
+                        "`2`: Option C"
+                    ],
+                    default: "`0`",
+                    recommendation: "Consult system specific documentation for optimal value."
+                },
+                {
+                    id: "GEN-02",
+                    name: "General Setting 2",
+                    explanation: "Another generic parameter for custom system behaviors.",
+                    settings: [
+                        "Range: `1` - `100` (unitless)"
+                    ],
+                    default: "`50`",
+                    recommendation: "Adjust based on system performance requirements and stability tests."
+                }
+            ]
+        };
+
+        let currentParameterData = driveData["DELTA MS300"]; // Initialize with DELTA MS300 data
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const parameterList = document.getElementById('parameterList');
+            const searchInput = document.getElementById('searchInput');
+            const driveModelSelect = document.getElementById('driveModelSelect');
+            const subHeader = document.getElementById('subHeader'); // Get the sub-header element
+            let activeParameterButton = null;
+
+            function updateSubHeader(modelName) {
+                subHeader.textContent = `An interactive guide for the ${modelName} Drive Model.`;
+            }
+
+            function displayParameterDetails(paramId) {
+                const detailsContainer = document.getElementById('parameterDetails');
+                const param = currentParameterData.find(p => p.id === paramId);
+                
+                if (!param) {
+                    detailsContainer.innerHTML = `<p class="text-slate-500">Select a parameter to see its details.</p>`;
+                    return;
+                }
+
+                let settingsHtml = param.settings.map(setting => 
+                    `<li class="flex items-start">
+                        <svg class="w-5 h-5 text-sky-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span>${setting.replace(/`([^`]+)`/g, '<code class="bg-slate-200 text-slate-800 font-mono py-0.5 px-1.5 rounded-md text-sm">$1</code>')}</span>
+                    </li>`
+                ).join('');
+                
+                let noteHtml = param.note ? `<div class="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+                    <h4 class="font-semibold mb-1">Note</h4>
+                    <p>${param.note}</p>
+                </div>` : '';
+
+                let recommendationHtml = param.recommendation ? `
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-800 mb-2">Recommendation</h3>
+                        <p class="text-slate-700">${param.recommendation.replace(/`([^`]+)`/g, '<code class="bg-slate-200 text-slate-800 font-mono py-0.5 px-1.5 rounded-md text-sm">$1</code>')}</p>
+                    </div>
+                ` : '';
+
+
+                detailsContainer.innerHTML = `
+                    <div class="animate-fade-in">
+                        <h2 class="text-2xl font-bold text-slate-900 mb-1">${param.id}: ${param.name}</h2>
+                        <p class="text-slate-600 mb-6">${param.explanation}</p>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-slate-800 mb-2">Settings</h3>
+                                <ul class="space-y-2 text-slate-700">${settingsHtml}</ul>
+                            </div>
+                            
+                            <div>
+                                <h3 class="text-lg font-semibold text-slate-800 mb-2">Default Value</h3>
+                                <p class="text-slate-700">${param.default.replace(/`([^`]+)`/g, '<code class="bg-slate-200 text-slate-800 font-mono py-0.5 px-1.5 rounded-md text-sm">$1</code>')}</p>
+                            </div>
+                            
+                            ${recommendationHtml}
+
+                        </div>
+                        
+                        ${noteHtml}
+                    </div>
+                `;
+            }
+
+            function populateList() {
+                parameterList.innerHTML = '';
+                document.getElementById('parameterDetails').innerHTML = `<p class="text-slate-500">Select a parameter to see its details.</p>`;
+                activeParameterButton = null; 
+                
+                updateSubHeader(driveModelSelect.value); // Update sub-header with current model
+
+                currentParameterData.forEach(param => {
+                    const button = document.createElement('button');
+                    // Ensure that focus styles maintain the border visibility
+                    button.className = 'w-full text-left my-1 p-2 rounded-lg transition duration-150 ease-in-out hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-2 focus:border-sky-500 border border-transparent';
+                    button.textContent = `${param.id}: ${param.name}`;
+                    button.dataset.paramId = param.id;
+                    
+                    button.addEventListener('click', () => {
+                        if (activeParameterButton) {
+                            activeParameterButton.classList.remove('bg-sky-100', 'text-sky-800', 'border-sky-500', 'border-2');
+                            activeParameterButton.classList.add('border-transparent');
+                        }
+                        button.classList.add('bg-sky-100', 'text-sky-800', 'border-2', 'border-sky-500');
+                        button.classList.remove('border-transparent');
+                        activeParameterButton = button;
+                        displayParameterDetails(param.id);
+                    });
+
+                    parameterList.appendChild(button);
+                });
+            }
+
+            // Event listener for the drive model select dropdown
+            driveModelSelect.addEventListener('change', (e) => {
+                const selectedModel = e.target.value;
+                currentParameterData = driveData[selectedModel]; 
+                populateList(); 
+                searchInput.value = ''; 
+                if (parameterList.firstChild) {
+                    parameterList.firstChild.click(); 
+                }
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const buttons = parameterList.getElementsByTagName('button');
+                Array.from(buttons).forEach(button => {
+                    const paramText = button.textContent.toLowerCase();
+                    if (paramText.includes(searchTerm)) {
+                        button.style.display = 'block';
+                    } else {
+                        button.style.display = 'none';
+                    }
+                });
+            });
+
+            // Initial population when the page loads
+            populateList();
+            if (parameterList.firstChild) {
+                parameterList.firstChild.click();
+            } else {
+                displayParameterDetails(null);
+            }
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fade-in {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-fade-in {
+                    animation: fade-in 0.3s ease-out forwards;
+                }
+            `;
+            document.head.append(style);
+        });
+    </script>
+</body>
+</html>
